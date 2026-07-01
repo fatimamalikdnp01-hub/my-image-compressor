@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fast & Free Image Compressor</title>
+    <!-- Google Fonts aur Bootstrap Icons ki styling ke liye -->
+    <link href="https://googleapis.com" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: #f4f7f6; color: #333; display: flex; flex-direction: column; min-height: 100vh; justify-content: center; align-items: center; padding: 20px; }
+        .container { background: #ffffff; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); max-width: 600px; width: 100%; text-align: center; }
+        h1 { font-size: 24px; color: #111; margin-bottom: 8px; font-weight: 700; }
+        p.subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+        .upload-area { border: 2px dashed #007bff; background: #f8faff; padding: 40px 20px; border-radius: 12px; cursor: pointer; transition: 0.3s; margin-bottom: 20px; position: relative; }
+        .upload-area:hover { background: #f0f5ff; }
+        .upload-area p { font-size: 15px; color: #444; font-weight: 500; }
+        .upload-area span { color: #007bff; text-decoration: underline; }
+        #fileInput { display: none; }
+        .control-group { margin-bottom: 20px; text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px; }
+        .control-group label { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #444; }
+        .slider { width: 100%; -webkit-appearance: none; height: 6px; border-radius: 5px; background: #ddd; outline: none; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #007bff; cursor: pointer; }
+        .stats { display: flex; justify-content: space-around; background: #e9ecef; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; display: none; }
+        .stats span { color: #007bff; font-weight: 700; }
+        .btn { background: #28a745; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: 600; border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s; display: none; text-decoration: none; }
+        .btn:hover { background: #218838; }
+        .preview-box { margin-top: 15px; max-height: 200px; overflow: hidden; border-radius: 8px; display: none; }
+        .preview-box img { max-width: 100%; height: auto; border-radius: 8px; }
+        .ad-space { margin-top: 25px; padding: 15px; background: #eee; border-radius: 8px; font-size: 12px; color: #888; text-align: center; border: 1px dashed #ccc; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Image Compressor</h1>
+        <p class="subtitle">Apni images ko bina quality kharab kiye compress karein.</p>
+
+        <!-- Upload Box -->
+        <div class="upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <p>File yahan Drop karein ya <span>Browse karein</span></p>
+            <input type="file" id="fileInput" accept="image/jpeg, image/png, image/webp">
+        </div>
+
+        <!-- Preview Image -->
+        <div class="preview-box" id="previewBox">
+            <img id="imagePreview" src="" alt="Preview">
+        </div>
+
+        <!-- Quality Control Slider -->
+        <div class="control-group">
+            <label>Compression Quality: <span id="qualityVal">80%</span></label>
+            <input type="range" id="qualitySlider" class="slider" min="10" max="100" value="80">
+        </div>
+
+        <!-- Size Info Stats -->
+        <div class="stats" id="statsBox">
+            <div>Original: <span id="origSize">0 KB</span></div>
+            <div>Compressed: <span id="compSize">0 KB</span></div>
+        </div>
+
+        <!-- Download Button -->
+        <a id="downloadBtn" class="btn" href="#" download="compressed-image.jpg">Compressed Image Download Karein</a>
+
+        <!-- AdSense Ads Place (Yahan Aap Ads Lagayeinge) -->
+        <div class="ad-space">
+            [Aapki Google AdSense Ka Ad Code Yahan Aaye Gaa]
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const qualitySlider = document.getElementById('qualitySlider');
+        const qualityVal = document.getElementById('qualityVal');
+        const statsBox = document.getElementById('statsBox');
+        const origSizeHtml = document.getElementById('origSize');
+        const compSizeHtml = document.getElementById('compSize');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const previewBox = document.getElementById('previewBox');
+        const imagePreview = document.getElementById('imagePreview');
+
+        let originalImage = null;
+
+        // Slider value update karne ke liye
+        qualitySlider.addEventListener('input', (e) => {
+            qualityVal.innerText = e.target.value + '%';
+            if (originalImage) compressImage(originalImage);
+        });
+
+        // File select hone par
+        fileInput.addEventListener('change', handleFile);
+
+        // Drag and Drop settings
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#eef4ff'; });
+        dropZone.addEventListener('dragleave', () => { dropZone.style.background = '#f8faff'; });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.background = '#f8faff';
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleFile();
+            }
+        });
+
+        function handleFile() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            origSizeHtml.innerText = (file.size / 1024).toFixed(2) + " KB";
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                originalImage = new Image();
+                originalImage.src = event.target.result;
+                originalImage.onload = function() {
+                    previewBox.style.display = 'block';
+                    imagePreview.src = originalImage.src;
+                    compressImage(originalImage);
+                }
+            }
+            reader.readAsDataURL(file);
+        }
+
+        // Image compress karne ka logic (HTML5 Canvas API)
+        function compressImage(imgSource) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = imgSource.naturalWidth;
+            canvas.height = imgSource.naturalHeight;
+
+            ctx.drawImage(imgSource, 0, 0, canvas.width, canvas.height);
+
+            const quality = qualitySlider.value / 100;
+            // WebP ya JPEG par compress karein
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+
+            // Size calculate karna
+            const stringLength = compressedDataUrl.length - 'data:image/jpeg;base64,'.length;
+            const sizeInBytes = 4 * Math.ceil((stringLength / 3)) * 0.5624896334383669;
+            
+            compSizeHtml.innerText = (sizeInBytes / 1024).toFixed(2) + " KB";
+            statsBox.style.display = 'flex';
+
+            // Download link setting
+            downloadBtn.href = compressedDataUrl;
+            downloadBtn.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
